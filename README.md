@@ -92,21 +92,21 @@ Right now the validation phase (which happens in the `ValidOperationRequest` con
 The errors are just printed, but the code already collects all of them (instead of stopping at the first one), so, whenever the need arises, we can manage errors in a different way.
 As long as we model our code correctly, and we don't lose data, we can always change the logic without too many issues.
 
-When the `PaymentsEngine` completes the processing, it returns the outcome (which is itself - the reason why is better explained in the "Other thoughts" section) and it's printed
+When the `PaymentsEngine` completes the processing, it returns the outcome (which is...the `PaymentsEngine` itself - the reason why is better explained in the "Other thoughts" section) and it's printed
 through [output_printer](src/output_printer.rs)
 
 ### Additional details
 
-The idea is that domain structs like [Account](src/domain/account_module/account.rs), [Transaction](src/domain/transaction_module/transaction.rs) and [ValidOperationRequest](src/domain/payments_engine/valid_operation_request.rs) can't be created on their own, 
+The idea is that domain structs like [Account](src/domain/account_module/account.rs), [Transaction](src/domain/transaction_module/transaction.rs) and [ValidOperationRequest](src/domain/payments_engine/valid_operation_request.rs) can't be created freely, 
 but they need to either be created by the validation flow (a Factory in DDD), or returned by the repository. 
-<br> I've achieved it by locking the `Account` and `Transaction` constructors to the `domain`, while `ValidOperationRequest` is not even visible from outside the `PaymentsEngine`. 
-I'm fine with `Account` and `Transaction` being constructable inside the domain, as this may be needed by future developments
+<br> I've achieved it by locking the usage of `Account` and `Transaction` constructors to the `domain` module, while `ValidOperationRequest` is not even visible from outside the `PaymentsEngine`. 
+I'm fine with `Account` and `Transaction` being constructable inside the domain, as this may be needed by future developments.
 
 
 You may have noticed that in the [ValidOperationRequest validation and building phase](src/domain/payments_engine/valid_operation_request/builder.rs) there is a bit of "duplication".
 I'm perfectly fine with it, because even if different type of operations are sharing the same validations, it's not correct to abstract them into a single method.
 Different operation types have different life cycles and may evolve differently, so it's correct from a "business" point of view that they are not grouped
-under the same code. TL;DR; don't over optimize for acronyms (in this case, DRY)
+under the same code. TL;DR: don't over optimize for acronyms (in this case, DRY)
 
 ## Assumptions
 
@@ -115,7 +115,7 @@ A couple assumptions have been made while developing this engine:
 - for `dispute`, `resolve` and `chargeback` operations the client is always ignored - the only valuable information is the transaction_id. I could have also removed the constraint on client being always present, but I just preferred to keep things simpler and not add other edge cases to manage.
 - while a `withdrawal` can't let a client balance go in negative, I've decided that the `dispute` can. From a Bank point of view, a transaction can always be disputed and a `dispute` can't just be ignored, but if that would make the client's balance go in negative, 
   it's an alarm: something is going wrong (a fraud?). It may signal that the client first deposited some money, then withdraw it and then opened a `dispute` on the first deposit, to double the money.
-- I'm treating `Operation` validation errors as errors from the third party's side, so invalid operations are not persisted. Because of this, if a CSV contains an invalid Operation with a specific `id` 7 followed by a valid one with the same `id`, the second one will be accepted.
+- I'm treating `Operation` validation errors as errors from the third party's side, so invalid operations are not persisted. Because of this, if a CSV contains an invalid Operation with a specific `id` followed by a valid one with the same `id`, the second one will be accepted.
   <br>The uniqueness check only applies to successfully processed operations.
 
 ## Potential issues
@@ -155,7 +155,6 @@ For this reason, I've thought that something would need to be postponed after th
 Here's the list of the next things to do:
 - adding tests in the missing places. I've implemented just one integration test that processes a CSV with all the cases in [process_from_csv_use_case_test](src/use_case/process_from_csv_use_case/process_from_csv_use_case_test.rs). 
   Coverage is already quite high (tarpaulin reports *90.73%*) covering all the important cases. <br>
-  Still, I'd like to cover the generic [payments_engine](src/domain/payments_engine.rs) with extensive integration tests, so that in the future the specific processors (like the csv_payments_engine) can be unit tested with the payments_engine mocked out. Again, right now the coverage is high enough
-  to be happy. This also opens up another discussion point: testing pyramid or diamond testing?
+  Still, I'd like to cover the generic [payments_engine](src/domain/payments_engine.rs) with extensive integration tests, so that in the future the specific processors (like the csv_payments_engine) can be unit tested with the payments_engine mocked out. This also opens up another discussion point: testing pyramid or diamond testing?
 
 - improve logging: right now it just focuses on errors for debugging. Having some `info` log would improve observability.
